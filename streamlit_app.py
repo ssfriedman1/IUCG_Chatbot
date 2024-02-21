@@ -13,16 +13,37 @@ if "messages" not in st.session_state.keys(): # Initialize the chat messages his
         {"role": "assistant", "content": "Ask me a question about IUCG's past project work!"}
     ]
 
+# @st.cache_resource(show_spinner=False)
+# def load_data():
+#     with st.spinner(text="Loading and indexing the IUCG Intranet – hang tight! This should take 1-2 minutes."):
+#         reader = SimpleDirectoryReader(input_dir="./data", recursive=True)
+#         docs = reader.load_data()
+#         service_context = ServiceContext.from_defaults(llm=OpenAI(model="gpt-3.5-turbo", temperature=0.5, system_prompt="You are an expert on the Streamlit Python library and your job is to answer technical questions. Assume that all questions are related to the Streamlit Python library. Keep your answers technical and based on facts – do not hallucinate features."))
+#         index = VectorStoreIndex.from_documents(docs, service_context=service_context)
+#         return index
+
+# index = load_data()
+
 @st.cache_resource(show_spinner=False)
 def load_data():
-    with st.spinner(text="Loading and indexing the IUCG Intranet – hang tight! This should take 1-2 minutes."):
-        reader = SimpleDirectoryReader(input_dir="./data", recursive=True)
-        docs = reader.load_data()
-        service_context = ServiceContext.from_defaults(llm=OpenAI(model="gpt-3.5-turbo", temperature=0.5, system_prompt="You are an expert on the Streamlit Python library and your job is to answer technical questions. Assume that all questions are related to the Streamlit Python library. Keep your answers technical and based on facts – do not hallucinate features."))
-        index = VectorStoreIndex.from_documents(docs, service_context=service_context)
-        return index
+    try:
+        with st.spinner(text="Loading and indexing the IUCG Intranet – hang tight! This should take 1-2 minutes."):
+            reader = SimpleDirectoryReader(input_dir="./data", recursive=True)
+            docs = []
+            for file_path in reader.get_all_files():
+                try:
+                    doc = reader.convert_file(file_path)
+                    docs.append(doc)
+                except Exception as e:
+                    st.warning(f"Skipped file {file_path} due to error: {str(e)}")
+            service_context = ServiceContext.from_defaults(llm=OpenAI(model="gpt-3.5-turbo", temperature=0.5, system_prompt="You are an expert on the Streamlit Python library and your job is to answer technical questions. Assume that all questions are related to the Streamlit Python library. Keep your answers technical and based on facts – do not hallucinate features."))
+            index = VectorStoreIndex.from_documents(docs, service_context=service_context)
+            return index
+    except Exception as e:
+        st.error(f"An error occurred while loading the data: {str(e)}")
 
 index = load_data()
+
 
 if "chat_engine" not in st.session_state.keys(): # Initialize the chat engine
         st.session_state.chat_engine = index.as_chat_engine(chat_mode="condense_question", verbose=True)
